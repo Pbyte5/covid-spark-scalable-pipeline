@@ -19,11 +19,15 @@ requires = ["uv_build>=0.12.20,<0.13.0"]
 build-backend = "uv_build"
 
 [tool.ruff]
-line-lenght = 100
+line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I"]
+select = ["E", "F", "I", "UP", "B", "AIR"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
 
 [dependency-groups]
 dev = [
