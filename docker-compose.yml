@@ -1,6 +1,6 @@
 services:
   namenode:
-    image: apache/hadoop:3.3.5
+    image: apache/hadoop:3.5.0
     hostname: namenode
     container_name: namenode
     command: ["hdfs", "namenode"]
@@ -12,7 +12,7 @@ services:
       ENSURE_NAMENODE_DIR: "/tmp/hadoop-root/dfs/name"
 
   datanode:
-    image: apache/hadoop:3.3.5
+    image: apache/hadoop:3.5.0
     hostname: datanode
     container_name: datanode
     command: ["hdfs", "datanode"]
@@ -22,7 +22,7 @@ services:
       - namenode
   
   resourcemanager:
-    image: apache/hadoop:3.3.5
+    image: apache/hadoop:3.5.0
     hostname: resourcemanager
     container_name: resourcemanager
     command: ["yarn", "resourcemanager"]
@@ -34,7 +34,7 @@ services:
       - namenode
     
   nodemanager:
-    image: apache/hadoop:3.3.5
+    image: apache/hadoop:3.5.0
     hostname: nodemanager
     container_name: nodemanager
     command: ["yarn", "nodemanager"]

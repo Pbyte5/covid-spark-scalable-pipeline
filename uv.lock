@@ -34,7 +34,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pyspark", specifier = ">=4.3.0" }]
+requires-dist = [{ name = "pyspark", specifier = "==4.3.0" }]
 
 [package.metadata.requires-dev]
 dev = [
