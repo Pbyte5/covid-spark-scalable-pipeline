@@ -1,55 +1,66 @@
+x-hadoop-common: &hadoop-common
+  image: apache/hadoop:3.5.0
+  env_file:
+    - ./hadoop.config
+  networks:
+    - data-net
+
+x-airflow-common: &airflow-common
+  image: covid-airflow
+  build: ./airflow
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
+    AIRFLOW__API__SECRET_KEY: ${AIRFLOW_SECRET_KEY}
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET}
+    #Just For local Develop
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS: "${AIRFLOW_ADMIN_USER:-admin}:admin"
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_PASSWORDS_FILE: "/opt/airflow/logs/simple_auth_passwords.json"
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+    - ./scripts:/opt/airflow/scripts
+  networks:
+    - data-net
+
 services:
   namenode:
-    image: apache/hadoop:3.5.0
+    <<: *hadoop-common
     hostname: namenode
     container_name: namenode
     command: ["hdfs", "namenode"]
     ports:
       - "9870:9870"
-    env_file:
-      - ./hadoop.config
     environment:
       ENSURE_NAMENODE_DIR: "/tmp/hadoop-root/dfs/name"
-    networks:
-      - data-net
 
   datanode:
-    image: apache/hadoop:3.5.0
+    <<: *hadoop-common
     hostname: datanode
     container_name: datanode
     command: ["hdfs", "datanode"]
-    env_file:
-      - ./hadoop.config
     depends_on:
       - namenode
-    networks:
-      - data-net
   
   resourcemanager:
-    image: apache/hadoop:3.5.0
+    <<: *hadoop-common
     hostname: resourcemanager
     container_name: resourcemanager
     command: ["yarn", "resourcemanager"]
     ports:
       - "8088:8088"
-    env_file:
-      - ./hadoop.config
     depends_on:
       - namenode
-    networks:
-      - data-net
     
   nodemanager:
-    image: apache/hadoop:3.5.0
+    <<: *hadoop-common
     hostname: nodemanager
     container_name: nodemanager
     command: ["yarn", "nodemanager"]
-    env_file:
-      - ./hadoop.config
     depends_on:
       - resourcemanager
-    networks:
-      - data-net
 
   spark-master:
     image: apache/spark:4.3.0
@@ -78,7 +89,67 @@ services:
       - ./src:/opt/spark/work-dir/src
       - ./data:/opt/spark/work-dir/data
     networks:
+      - data-net 
+    
+  
+  postgres:
+    image: postgres:16-alpine
+    container_name: airflow-postgres
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
       - data-net
+
+  airflow-init:
+    <<: *airflow-common 
+    container_name: airflow-init
+    command: >
+      bash -c "airflow db migrate &&
+      echo '{\"${AIRFLOW_ADMIN_USER:-admin}\": \"${AIRFLOW_ADMIN_PASSWORD:-admin}\"}' > /opt/airflow/logs/simple_auth_passwords.json"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  airflow-apiserver:
+    <<: *airflow-common 
+    container_name: airflow-apiserver
+    command: api-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    
+  airflow-dag-processor:
+    <<: *airflow-common
+    container_name: airflow-dag-processor
+    command: dag-processor
+    restart: unless-stopped
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: airflow-scheduler
+    command: scheduler
+    restart: unless-stopped
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:
 networks:
   data-net:
     driver: bridge

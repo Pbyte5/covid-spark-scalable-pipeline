@@ -8,3 +8,8 @@ wheels/
 
 # Virtual environments
 .venv
+.env
+/data
+.ruff_cache
+logs/*
+!logs/.gitkeep
